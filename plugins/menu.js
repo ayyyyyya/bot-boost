@@ -7,45 +7,68 @@ export const run = {
       client, text, isPrefix, command, setting, plugins, Config, Utils, system
    }) => {
       try {
-         const local_size = fs.existsSync('./' + Config.database + '.json') ? await Utils.formatSize(fs.statSync('./' + Config.database + '.json').size) : ''
+         const local_size = fs.existsSync('./' + Config.database + '.json')
+            ? await Utils.formatSize(fs.statSync('./' + Config.database + '.json').size)
+            : ''
+
          const library = JSON.parse(fs.readFileSync('./node_modules/baileys/package.json', 'utf-8'))
+
          let message = setting.msg
             .replace('+tag', `@${m.sender.replace(/@.+/g, '')}`)
-            .replace('+name', m.pushName).replace('+greeting', Utils.greeting())
-            .replace('+db', (system.name === 'Local' ? `Local (${local_size})` : system.name))
+            .replace('+name', m.pushName)
+            .replace('+greeting', Utils.greeting())
+            .replace('+db', system.name === 'Local' ? `Local (${local_size})` : system.name)
             .replace('+module', Version)
             .replace('+version', library.version)
 
          const style = setting.style
+         const hidden = (setting.hidden || []).map(v => String(v).toLowerCase())
 
-         let filter = Object.entries(plugins).filter(([_, obj]) => obj.run.usage)
+         let filter = Object.entries(plugins).filter(([_, obj]) => {
+            return obj?.run?.usage && obj?.run?.category
+         })
+
          let cmdObj = Object.fromEntries(filter)
          let category = {}
 
          for (let name in cmdObj) {
-            let obj = cmdObj[name].run
-            if (!obj || !obj.category || setting.hidden.includes(obj.category)) continue
-            if (!category[obj.category]) category[obj.category] = []
-            category[obj.category].push(obj)
+            let obj = cmdObj[name]?.run
+            if (!obj?.category) continue
+
+            let cat = String(obj.category).toLowerCase()
+            if (hidden.includes(cat)) continue
+
+            if (!category[cat]) category[cat] = []
+            category[cat].push(obj)
          }
 
          const keys = Object.keys(category).sort()
 
          const getFormattedCommands = (catName) => {
-            let cmdList = Object.entries(plugins).filter(([_, v]) => v.run.usage && v.run.category == catName.toLowerCase() && !setting.hidden.includes(v.run.category.toLowerCase()))
+            let target = String(catName).toLowerCase()
+
+            let cmdList = Object.entries(plugins).filter(([_, v]) => {
+               let run = v?.run
+               if (!run?.usage || !run?.category) return false
+
+               let cat = String(run.category).toLowerCase()
+               return cat === target && !hidden.includes(cat)
+            })
+
             let commands = []
 
             cmdList.map(([_, v]) => {
-               let usageType = v.run.usage.constructor.name
+               let usage = v.run.usage
+               let usageType = usage.constructor.name
 
                if (usageType === 'Array') {
-                  v.run.usage.map(x => commands.push({
+                  usage.map(x => commands.push({
                      usage: x,
                      use: v.run.use ? Utils.texted('bold', v.run.use) : ''
                   }))
                } else if (usageType === 'String') {
                   commands.push({
-                     usage: v.run.usage,
+                     usage: usage,
                      use: v.run.use ? Utils.texted('bold', v.run.use) : ''
                   })
                }
@@ -87,8 +110,10 @@ export const run = {
          if (command === 'allmenu') {
             for (let k of keys) {
                print += '\n\n乂  *' + k.toUpperCase().split('').join(' ') + '*\n\n'
+
                let commands = getFormattedCommands(k)
                if (commands.length == 0) continue
+
                print += commands.map(v => `	◦  ${isPrefix + v.usage} ${v.use}`).join('\n')
             }
 
@@ -106,10 +131,15 @@ export const run = {
             case 3:
                for (let k of keys) {
                   let divider = style === 1 ? '乂' : '-'
+
                   print += `\n\n ${divider}  *` + k.toUpperCase().split('').join(' ') + '*\n\n'
+
                   let commands = getFormattedCommands(k)
                   if (commands.length == 0) continue
-                  print += style === 1 ? commands.map(v => `	◦  ${isPrefix + v.usage} ${v.use}`).join('\n') : formatPrefixList(commands)
+
+                  print += style === 1
+                     ? commands.map(v => `	◦  ${isPrefix + v.usage} ${v.use}`).join('\n')
+                     : formatPrefixList(commands)
                }
 
                let formattedPrintStyle123 = style === 3 ? print : Utils.Styles(print)
@@ -127,15 +157,20 @@ export const run = {
                if (text) {
                   let commands = getFormattedCommands(text.trim())
                   if (commands.length === 0) return
+
                   let out = formatPrefixList(commands)
-                  m.reply(style === 6 ? Utils.Styles(out) : out)
+                  m.reply(style === 5 ? Utils.Styles(out) : out)
                } else {
                   print += '\n'
+
                   let out = formatPrefixList(keys.map(k => ({
                      usage: command,
                      use: k
                   })))
-                  let formattedPrint = style === 6 ? Utils.Styles(print + out) : (print + out)
+
+                  let formattedPrint = style === 5
+                     ? Utils.Styles(print + out)
+                     : print + out
 
                   client.sendMessageModify(m.chat, formattedPrint + '\n\n' + global.footer, m, {
                      ads: false,
@@ -150,6 +185,7 @@ export const run = {
                if (text) {
                   let commands = getFormattedCommands(text.trim())
                   if (commands.length === 0) return
+
                   m.reply(Utils.Styles(formatPrefixList(commands)))
                } else {
                   const buttonsV7 = [{
@@ -174,6 +210,7 @@ export const run = {
                if (text) {
                   let commands = getFormattedCommands(text.trim())
                   if (commands.length === 0) return
+
                   m.reply(Utils.Styles(formatPrefixList(commands)))
                } else {
                   const buttonsV8 = [
@@ -232,6 +269,24 @@ export const run = {
                      }
                   })
                }
+               break
+
+            default:
+               for (let k of keys) {
+                  print += '\n\n乂  *' + k.toUpperCase().split('').join(' ') + '*\n\n'
+
+                  let commands = getFormattedCommands(k)
+                  if (commands.length == 0) continue
+
+                  print += commands.map(v => `	◦  ${isPrefix + v.usage} ${v.use}`).join('\n')
+               }
+
+               client.sendMessageModify(m.chat, Utils.Styles(print) + '\n\n' + global.footer, m, {
+                  ads: false,
+                  largeThumb: true,
+                  thumbnail: Utils.isUrl(setting.cover) ? setting.cover : Buffer.from(setting.cover, 'base64'),
+                  url: setting.link
+               })
                break
          }
       } catch (e) {
