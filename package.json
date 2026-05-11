@@ -1,0 +1,70 @@
+{
+   "name": "neoxr-bot",
+   "version": "5.1-optima",
+   "description": "WhatsApp Bot (Premium)",
+   "main": "index.js",
+   "type": "module",
+   "scripts": {
+      "build": "cd ./nuxt && yarn && yarn run generate",
+      "test": "node --experimental-vm-modules ./node_modules/.bin/jest unit-test",
+      "start": "node ."
+   },
+   "engines": {
+      "node": ">= 20.x"
+   },
+   "repository": {
+      "type": "git",
+      "url": "git+https://github.com/neoxr/neoxr-bot.git"
+   },
+   "keywords": [
+      "wb",
+      "bot"
+   ],
+   "author": "Wildan Izzudin",
+   "license": "ISC",
+   "bugs": {
+      "url": "https://github.com/neoxr/neoxr-bot/issues"
+   },
+   "homepage": "https://github.com/neoxr/neoxr-bot#readme",
+   "dependencies": {
+      "@adiwajshing/keyed-db": "^0.2.4",
+      "@google/generative-ai": "^0.24.1",
+      "@neoxr/wb": "git+https://github.com/neoxr/wb.git#0c404dc85019f18d61d33df49aa9cf33ac02a78a",
+      "@neoxr/webly": "^0.0.10",
+      "@tensorflow/tfjs-node": "^4.22.0",
+      "adm-zip": "~0.5.10",
+      "async-retry": "^1.3.3",
+      "audio-decode": "^2.1.3",
+      "baileys": "npm:@neoxr/baileys",
+      "better-sqlite3": "~12.1.1",
+      "canvacord": "5.4.8",
+      "canvas": "3.2.0",
+      "crypto-js": "^4.2.0",
+      "groq-sdk": "^0.30.0",
+      "html-entities": "2.6.0",
+      "multer": "~2.0.2",
+      "node-gtts": "^2.0.2",
+      "nodemailer": "^6.9.13",
+      "nsfwjs": "npm:nsfwjs-patched",
+      "qrcode": "^1.5.4",
+      "sharp": "0.34.5",
+      "translate-google-api": "1.0.4",
+      "yt-search": "^2.10.3"
+   },
+   "devDependencies": {
+      "fflate": "^0.8.2",
+      "multer": "~2.0.1"
+   },
+   "nodemonConfig": {
+      "ignore": [
+         "**.json"
+      ],
+      "delay": 2500
+   },
+   "overrides": {
+      "jimp": "~0.22.12"
+   },
+   "resolutions": {
+      "jimp": "~0.22.12"
+   }
+}
