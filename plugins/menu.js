@@ -15,59 +15,82 @@ export const run = {
       system
    }) => {
       try {
-         const local_size = fs.existsSync('./' + Config.database + '.json')
-            ? await Utils.formatSize(fs.statSync('./' + Config.database + '.json').size)
-            : ''
+         const hidden = Array.isArray(setting?.hidden)
+            ? setting.hidden.map(v => String(v).toLowerCase())
+            : []
 
-         const library = JSON.parse(fs.readFileSync('./node_modules/baileys/package.json', 'utf-8'))
+         let local_size = ''
+         try {
+            const dbPath = './' + Config.database + '.json'
+            local_size = fs.existsSync(dbPath)
+               ? await Utils.formatSize(fs.statSync(dbPath).size)
+               : ''
+         } catch {
+            local_size = ''
+         }
 
-         const message = setting.msg
-            .replace('+tag', `@${m.sender.replace(/@.+/g, '')}`)
-            .replace('+name', m.pushName || 'User')
-            .replace('+greeting', Utils.greeting())
-            .replace('+db', system.name === 'Local' ? `Local (${local_size})` : system.name)
-            .replace('+module', Version)
-            .replace('+version', library.version)
+         let baileysVersion = 'unknown'
+         try {
+            const library = JSON.parse(fs.readFileSync('./node_modules/baileys/package.json', 'utf-8'))
+            baileysVersion = library.version || 'unknown'
+         } catch {
+            baileysVersion = 'unknown'
+         }
 
-         const style = setting.style || 4
+         const template = String(setting?.msg || `Hi +tag
 
-         const filter = Object.entries(plugins).filter(([_, obj]) => obj.run.usage)
-         const cmdObj = Object.fromEntries(filter)
+◦ Module : +module
+◦ Database : +db
+◦ Library : Baileys v+version`)
+
+         const message = template
+            .replace(/\+tag/g, `@${m.sender.replace(/@.+/g, '')}`)
+            .replace(/\+name/g, m.pushName || 'User')
+            .replace(/\+greeting/g, Utils.greeting())
+            .replace(/\+db/g, system.name === 'Local' ? `Local (${local_size})` : system.name)
+            .replace(/\+module/g, Version)
+            .replace(/\+version/g, baileysVersion)
+
+         const style = Number(setting?.style || 4)
+
          const category = {}
 
-         for (let name in cmdObj) {
-            const obj = cmdObj[name].run
-            if (!obj || !obj.category || setting.hidden.includes(obj.category)) continue
-            if (!category[obj.category]) category[obj.category] = []
-            category[obj.category].push(obj)
+         for (let name in plugins) {
+            const obj = plugins[name]
+            const cmd = obj?.run
+
+            if (!cmd?.usage || !cmd?.category) continue
+
+            const cat = String(cmd.category).toLowerCase()
+            if (hidden.includes(cat)) continue
+
+            if (!category[cmd.category]) category[cmd.category] = []
+            category[cmd.category].push(cmd)
          }
 
          const keys = Object.keys(category).sort()
 
          const getFormattedCommands = (catName) => {
-            const cmdList = Object.entries(plugins).filter(([_, v]) => {
-               return v.run.usage &&
-                  v.run.category &&
-                  v.run.category.toLowerCase() === catName.toLowerCase() &&
-                  !setting.hidden.includes(v.run.category.toLowerCase())
-            })
-
             const commands = []
 
-            cmdList.map(([_, v]) => {
-               const usageType = v.run.usage.constructor.name
+            Object.entries(plugins || {}).map(([_, v]) => {
+               const cmd = v?.run
+               if (!cmd?.usage || !cmd?.category) return
 
-               if (usageType === 'Array') {
-                  v.run.usage.map(x => commands.push({
-                     usage: x,
-                     use: v.run.use ? Utils.texted('bold', v.run.use) : ''
-                  }))
-               } else if (usageType === 'String') {
+               const cat = String(cmd.category).toLowerCase()
+               if (cat !== String(catName).toLowerCase()) return
+               if (hidden.includes(cat)) return
+
+               const usages = Array.isArray(cmd.usage) ? cmd.usage : [cmd.usage]
+
+               usages.map(x => {
+                  if (!x) return
+
                   commands.push({
-                     usage: v.run.usage,
-                     use: v.run.use ? Utils.texted('bold', v.run.use) : ''
+                     usage: x,
+                     use: cmd.use ? Utils.texted('bold', cmd.use) : ''
                   })
-               }
+               })
             })
 
             return commands.sort((a, b) => a.usage.localeCompare(b.usage))
@@ -84,9 +107,19 @@ export const run = {
          }
 
          const sendSafeMenu = async (caption) => {
-            const finalCaption = caption + '\n\n' + global.footer
+            const finalCaption = [caption, global.footer].filter(Boolean).join('\n\n')
 
             try {
+               // Kalau teks panjang, jangan kirim sebagai caption gambar.
+               // Ini lebih aman untuk Baileys.
+               if (finalCaption.length > 2500) {
+                  return client.reply(m.chat, finalCaption, m)
+               }
+
+               if (!setting?.cover) {
+                  return client.reply(m.chat, finalCaption, m)
+               }
+
                if (Utils.isUrl(setting.cover)) {
                   return await client.sendMessage(m.chat, {
                      image: {
@@ -132,7 +165,7 @@ export const run = {
                if (!commands.length) continue
 
                print += '\n\n乂  *' + k.toUpperCase().split('').join(' ') + '*\n\n'
-               print += commands.map(v => `	◦  ${isPrefix + v.usage} ${v.use}`).join('\n')
+               print += commands.map(v => `   ◦  ${isPrefix + v.usage} ${v.use}`).join('\n')
             }
 
             return sendSafeMenu(Utils.Styles(print))
@@ -146,7 +179,7 @@ export const run = {
 
                print += `\n\n ${divider}  *` + k.toUpperCase().split('').join(' ') + '*\n\n'
                print += style === 1
-                  ? commands.map(v => `	◦  ${isPrefix + v.usage} ${v.use}`).join('\n')
+                  ? commands.map(v => `   ◦  ${isPrefix + v.usage} ${v.use}`).join('\n')
                   : formatPrefixList(commands)
             }
 
@@ -178,7 +211,8 @@ export const run = {
 
          return sendSafeMenu(print)
       } catch (e) {
-         client.reply(m.chat, Utils.jsonFormat(e), m)
+         console.error(e)
+         return client.reply(m.chat, Utils.jsonFormat ? Utils.jsonFormat(e) : String(e?.stack || e), m)
       }
    },
    error: false
