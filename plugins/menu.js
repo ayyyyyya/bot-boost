@@ -4,7 +4,15 @@ import fs from 'node:fs'
 export const run = {
    usage: ['menu', 'help', 'command', 'allmenu'],
    async: async (m, {
-      client, text, isPrefix, command, setting, plugins, Config, Utils, system
+      client,
+      text,
+      isPrefix,
+      command,
+      setting,
+      plugins,
+      Config,
+      Utils,
+      system
    }) => {
       try {
          const local_size = fs.existsSync('./' + Config.database + '.json')
@@ -13,62 +21,50 @@ export const run = {
 
          const library = JSON.parse(fs.readFileSync('./node_modules/baileys/package.json', 'utf-8'))
 
-         let message = setting.msg
+         const message = setting.msg
             .replace('+tag', `@${m.sender.replace(/@.+/g, '')}`)
-            .replace('+name', m.pushName)
+            .replace('+name', m.pushName || 'User')
             .replace('+greeting', Utils.greeting())
             .replace('+db', system.name === 'Local' ? `Local (${local_size})` : system.name)
             .replace('+module', Version)
             .replace('+version', library.version)
 
-         const style = setting.style
-         const hidden = (setting.hidden || []).map(v => String(v).toLowerCase())
+         const style = setting.style || 4
 
-         let filter = Object.entries(plugins).filter(([_, obj]) => {
-            return obj?.run?.usage && obj?.run?.category
-         })
-
-         let cmdObj = Object.fromEntries(filter)
-         let category = {}
+         const filter = Object.entries(plugins).filter(([_, obj]) => obj.run.usage)
+         const cmdObj = Object.fromEntries(filter)
+         const category = {}
 
          for (let name in cmdObj) {
-            let obj = cmdObj[name]?.run
-            if (!obj?.category) continue
-
-            let cat = String(obj.category).toLowerCase()
-            if (hidden.includes(cat)) continue
-
-            if (!category[cat]) category[cat] = []
-            category[cat].push(obj)
+            const obj = cmdObj[name].run
+            if (!obj || !obj.category || setting.hidden.includes(obj.category)) continue
+            if (!category[obj.category]) category[obj.category] = []
+            category[obj.category].push(obj)
          }
 
          const keys = Object.keys(category).sort()
 
          const getFormattedCommands = (catName) => {
-            let target = String(catName).toLowerCase()
-
-            let cmdList = Object.entries(plugins).filter(([_, v]) => {
-               let run = v?.run
-               if (!run?.usage || !run?.category) return false
-
-               let cat = String(run.category).toLowerCase()
-               return cat === target && !hidden.includes(cat)
+            const cmdList = Object.entries(plugins).filter(([_, v]) => {
+               return v.run.usage &&
+                  v.run.category &&
+                  v.run.category.toLowerCase() === catName.toLowerCase() &&
+                  !setting.hidden.includes(v.run.category.toLowerCase())
             })
 
-            let commands = []
+            const commands = []
 
             cmdList.map(([_, v]) => {
-               let usage = v.run.usage
-               let usageType = usage.constructor.name
+               const usageType = v.run.usage.constructor.name
 
                if (usageType === 'Array') {
-                  usage.map(x => commands.push({
+                  v.run.usage.map(x => commands.push({
                      usage: x,
                      use: v.run.use ? Utils.texted('bold', v.run.use) : ''
                   }))
                } else if (usageType === 'String') {
                   commands.push({
-                     usage: usage,
+                     usage: v.run.usage,
                      use: v.run.use ? Utils.texted('bold', v.run.use) : ''
                   })
                }
@@ -78,217 +74,109 @@ export const run = {
          }
 
          const formatPrefixList = (commandsList) => {
-            if (commandsList.length === 0) return ''
+            if (!commandsList.length) return ''
 
             return commandsList.map((v, i) => {
-               if (i == 0) return `┌  ◦  ${isPrefix + v.usage} ${v.use}`
-               if (i == commandsList.length - 1) return `└  ◦  ${isPrefix + v.usage} ${v.use}`
+               if (i === 0) return `┌  ◦  ${isPrefix + v.usage} ${v.use}`
+               if (i === commandsList.length - 1) return `└  ◦  ${isPrefix + v.usage} ${v.use}`
                return `│  ◦  ${isPrefix + v.usage} ${v.use}`
             }).join('\n')
          }
 
-         const buildSections = () => {
-            let sections = []
-            const label = {
-               highlight_label: 'Many Used'
+         const sendSafeMenu = async (caption) => {
+            const finalCaption = caption + '\n\n' + global.footer
+
+            try {
+               if (Utils.isUrl(setting.cover)) {
+                  return await client.sendMessage(m.chat, {
+                     image: {
+                        url: setting.cover
+                     },
+                     caption: finalCaption,
+                     mentions: [m.sender]
+                  }, {
+                     quoted: m
+                  })
+               }
+
+               const buffer = Buffer.from(setting.cover, 'base64')
+
+               return await client.sendMessage(m.chat, {
+                  image: buffer,
+                  caption: finalCaption,
+                  mentions: [m.sender]
+               }, {
+                  quoted: m
+               })
+            } catch (e) {
+               return client.reply(m.chat, finalCaption, m)
             }
-
-            keys.sort((a, b) => a.localeCompare(b)).map((v) => sections.push({
-               ...(/download|conver|util/.test(v) ? label : {}),
-               rows: [{
-                  title: Utils.ucword(v),
-                  description: `There are ${getFormattedCommands(v).length} commands`,
-                  id: `${isPrefix + command} ${v}`
-               }]
-            }))
-
-            return sections
          }
 
          let print = message + '\n' + String.fromCharCode(8206).repeat(4001)
 
+         if (text) {
+            const commands = getFormattedCommands(text.trim())
+
+            if (!commands.length) {
+               return client.reply(m.chat, `🚩 Menu *${text}* tidak ditemukan.`, m)
+            }
+
+            const categoryText = `乂  *${text.toUpperCase().split('').join(' ')}*\n\n${formatPrefixList(commands)}`
+            return sendSafeMenu(categoryText)
+         }
+
          if (command === 'allmenu') {
             for (let k of keys) {
+               const commands = getFormattedCommands(k)
+               if (!commands.length) continue
+
                print += '\n\n乂  *' + k.toUpperCase().split('').join(' ') + '*\n\n'
-
-               let commands = getFormattedCommands(k)
-               if (commands.length == 0) continue
-
                print += commands.map(v => `	◦  ${isPrefix + v.usage} ${v.use}`).join('\n')
             }
 
-            return client.sendMessageModify(m.chat, Utils.Styles(print) + '\n\n' + global.footer, m, {
-               ads: false,
-               largeThumb: true,
-               thumbnail: Utils.isUrl(setting.cover) ? setting.cover : Buffer.from(setting.cover, 'base64'),
-               url: setting.link
-            })
+            return sendSafeMenu(Utils.Styles(print))
          }
 
-         switch (style) {
-            case 1:
-            case 2:
-            case 3:
-               for (let k of keys) {
-                  let divider = style === 1 ? '乂' : '-'
+         if (style === 1 || style === 2 || style === 3) {
+            for (let k of keys) {
+               const divider = style === 1 ? '乂' : '-'
+               const commands = getFormattedCommands(k)
+               if (!commands.length) continue
 
-                  print += `\n\n ${divider}  *` + k.toUpperCase().split('').join(' ') + '*\n\n'
+               print += `\n\n ${divider}  *` + k.toUpperCase().split('').join(' ') + '*\n\n'
+               print += style === 1
+                  ? commands.map(v => `	◦  ${isPrefix + v.usage} ${v.use}`).join('\n')
+                  : formatPrefixList(commands)
+            }
 
-                  let commands = getFormattedCommands(k)
-                  if (commands.length == 0) continue
-
-                  print += style === 1
-                     ? commands.map(v => `	◦  ${isPrefix + v.usage} ${v.use}`).join('\n')
-                     : formatPrefixList(commands)
-               }
-
-               let formattedPrintStyle123 = style === 3 ? print : Utils.Styles(print)
-
-               client.sendMessageModify(m.chat, formattedPrintStyle123 + '\n\n' + global.footer, m, {
-                  ads: false,
-                  largeThumb: true,
-                  thumbnail: Utils.isUrl(setting.cover) ? setting.cover : Buffer.from(setting.cover, 'base64'),
-                  url: setting.link
-               })
-               break
-
-            case 4:
-            case 5:
-               if (text) {
-                  let commands = getFormattedCommands(text.trim())
-                  if (commands.length === 0) return
-
-                  let out = formatPrefixList(commands)
-                  m.reply(style === 5 ? Utils.Styles(out) : out)
-               } else {
-                  print += '\n'
-
-                  let out = formatPrefixList(keys.map(k => ({
-                     usage: command,
-                     use: k
-                  })))
-
-                  let formattedPrint = style === 5
-                     ? Utils.Styles(print + out)
-                     : print + out
-
-                  client.sendMessageModify(m.chat, formattedPrint + '\n\n' + global.footer, m, {
-                     ads: false,
-                     largeThumb: true,
-                     thumbnail: Utils.isUrl(setting.cover) ? setting.cover : Buffer.from(setting.cover, 'base64'),
-                     url: setting.link
-                  })
-               }
-               break
-
-            case 6:
-               if (text) {
-                  let commands = getFormattedCommands(text.trim())
-                  if (commands.length === 0) return
-
-                  m.reply(Utils.Styles(formatPrefixList(commands)))
-               } else {
-                  const buttonsV7 = [{
-                     name: 'single_select',
-                     buttonParamsJson: JSON.stringify({
-                        title: 'Tap Here!',
-                        sections: buildSections()
-                     })
-                  }]
-
-                  client.sendIAMessage(m.chat, buttonsV7, m, {
-                     header: global.header,
-                     content: message,
-                     v2: true,
-                     footer: global.footer,
-                     media: Utils.isUrl(setting.cover) ? setting.cover : Buffer.from(setting.cover, 'base64')
-                  })
-               }
-               break
-
-            case 7:
-               if (text) {
-                  let commands = getFormattedCommands(text.trim())
-                  if (commands.length === 0) return
-
-                  m.reply(Utils.Styles(formatPrefixList(commands)))
-               } else {
-                  const buttonsV8 = [
-                     {
-                        name: 'cta_url',
-                        buttonParamsJson: JSON.stringify({
-                           display_text: 'Wapify - WhatsApp Gateway',
-                           url: 'https://wapify.neoxr.eu',
-                           merchant_url: 'https://wapify.neoxr.eu'
-                        })
-                     },
-                     {
-                        name: 'cta_url',
-                        buttonParamsJson: JSON.stringify({
-                           display_text: 'Neoxr API',
-                           url: 'https://api.neoxr.eu',
-                           merchant_url: 'https://api.neoxr.eu'
-                        })
-                     },
-                     {
-                        name: 'cta_url',
-                        buttonParamsJson: JSON.stringify({
-                           display_text: 'Temporary Uploader',
-                           url: 'https://s.neoxr.eu',
-                           merchant_url: 'https://s.neoxr.eu'
-                        })
-                     },
-                     {
-                        name: 'cta_url',
-                        buttonParamsJson: JSON.stringify({
-                           display_text: 'Neoxr Official Store',
-                           url: 'https://shop.neoxr.eu',
-                           merchant_url: 'https://shop.neoxr.eu'
-                        })
-                     },
-                     {
-                        name: 'single_select',
-                        buttonParamsJson: JSON.stringify({
-                           title: 'Next Page',
-                           sections: buildSections()
-                        })
-                     }
-                  ]
-
-                  client.sendIAMessage(m.chat, buttonsV8, m, {
-                     header: global.header,
-                     content: message,
-                     v2: true,
-                     footer: global.footer,
-                     media: Utils.isUrl(setting.cover) ? setting.cover : Buffer.from(setting.cover, 'base64'),
-                     multiple: {
-                        name: 'オートメーション',
-                        code: 'Neoxr Creative',
-                        list_title: 'Select Menu',
-                        button_title: 'Tap Here!'
-                     }
-                  })
-               }
-               break
-
-            default:
-               for (let k of keys) {
-                  print += '\n\n乂  *' + k.toUpperCase().split('').join(' ') + '*\n\n'
-
-                  let commands = getFormattedCommands(k)
-                  if (commands.length == 0) continue
-
-                  print += commands.map(v => `	◦  ${isPrefix + v.usage} ${v.use}`).join('\n')
-               }
-
-               client.sendMessageModify(m.chat, Utils.Styles(print) + '\n\n' + global.footer, m, {
-                  ads: false,
-                  largeThumb: true,
-                  thumbnail: Utils.isUrl(setting.cover) ? setting.cover : Buffer.from(setting.cover, 'base64'),
-                  url: setting.link
-               })
-               break
+            const formatted = style === 3 ? print : Utils.Styles(print)
+            return sendSafeMenu(formatted)
          }
+
+         if (style === 4 || style === 5 || style === 6 || style === 7) {
+            print += '\n'
+
+            const menuCategories = keys.map(k => ({
+               usage: command,
+               use: k
+            }))
+
+            print += formatPrefixList(menuCategories)
+
+            return sendSafeMenu(print)
+         }
+
+         print += '\n'
+
+         const menuCategories = keys.map(k => ({
+            usage: command,
+            use: k
+         }))
+
+         print += formatPrefixList(menuCategories)
+
+         return sendSafeMenu(print)
       } catch (e) {
          client.reply(m.chat, Utils.jsonFormat(e), m)
       }
