@@ -28,24 +28,35 @@ export const run = {
             if (!category[obj.category]) category[obj.category] = []
             category[obj.category].push(obj)
          }
+
          const keys = Object.keys(category).sort()
 
          const getFormattedCommands = (catName) => {
             let cmdList = Object.entries(plugins).filter(([_, v]) => v.run.usage && v.run.category == catName.toLowerCase() && !setting.hidden.includes(v.run.category.toLowerCase()))
             let commands = []
+
             cmdList.map(([_, v]) => {
                let usageType = v.run.usage.constructor.name
+
                if (usageType === 'Array') {
-                  v.run.usage.map(x => commands.push({ usage: x, use: v.run.use ? Utils.texted('bold', v.run.use) : '' }))
+                  v.run.usage.map(x => commands.push({
+                     usage: x,
+                     use: v.run.use ? Utils.texted('bold', v.run.use) : ''
+                  }))
                } else if (usageType === 'String') {
-                  commands.push({ usage: v.run.usage, use: v.run.use ? Utils.texted('bold', v.run.use) : '' })
+                  commands.push({
+                     usage: v.run.usage,
+                     use: v.run.use ? Utils.texted('bold', v.run.use) : ''
+                  })
                }
             })
+
             return commands.sort((a, b) => a.usage.localeCompare(b.usage))
          }
 
          const formatPrefixList = (commandsList) => {
             if (commandsList.length === 0) return ''
+
             return commandsList.map((v, i) => {
                if (i == 0) return `┌  ◦  ${isPrefix + v.usage} ${v.use}`
                if (i == commandsList.length - 1) return `└  ◦  ${isPrefix + v.usage} ${v.use}`
@@ -55,7 +66,10 @@ export const run = {
 
          const buildSections = () => {
             let sections = []
-            const label = { highlight_label: 'Many Used' }
+            const label = {
+               highlight_label: 'Many Used'
+            }
+
             keys.sort((a, b) => a.localeCompare(b)).map((v) => sections.push({
                ...(/download|conver|util/.test(v) ? label : {}),
                rows: [{
@@ -64,6 +78,7 @@ export const run = {
                   id: `${isPrefix + command} ${v}`
                }]
             }))
+
             return sections
          }
 
@@ -76,8 +91,12 @@ export const run = {
                if (commands.length == 0) continue
                print += commands.map(v => `	◦  ${isPrefix + v.usage} ${v.use}`).join('\n')
             }
+
             return client.sendMessageModify(m.chat, Utils.Styles(print) + '\n\n' + global.footer, m, {
-               ads: false, largeThumb: true, thumbnail: Utils.isUrl(setting.cover) ? setting.cover : Buffer.from(setting.cover, 'base64'), url: setting.link
+               ads: false,
+               largeThumb: true,
+               thumbnail: Utils.isUrl(setting.cover) ? setting.cover : Buffer.from(setting.cover, 'base64'),
+               url: setting.link
             })
          }
 
@@ -86,15 +105,20 @@ export const run = {
             case 2:
             case 3:
                for (let k of keys) {
-                  let divider = style === 1 ? '乂' : '–'
+                  let divider = style === 1 ? '乂' : '-'
                   print += `\n\n ${divider}  *` + k.toUpperCase().split('').join(' ') + '*\n\n'
                   let commands = getFormattedCommands(k)
                   if (commands.length == 0) continue
                   print += style === 1 ? commands.map(v => `	◦  ${isPrefix + v.usage} ${v.use}`).join('\n') : formatPrefixList(commands)
                }
+
                let formattedPrintStyle123 = style === 3 ? print : Utils.Styles(print)
+
                client.sendMessageModify(m.chat, formattedPrintStyle123 + '\n\n' + global.footer, m, {
-                  ads: false, largeThumb: true, thumbnail: Utils.isUrl(setting.cover) ? setting.cover : Buffer.from(setting.cover, 'base64'), url: setting.link
+                  ads: false,
+                  largeThumb: true,
+                  thumbnail: Utils.isUrl(setting.cover) ? setting.cover : Buffer.from(setting.cover, 'base64'),
+                  url: setting.link
                })
                break
 
@@ -107,10 +131,17 @@ export const run = {
                   m.reply(style === 6 ? Utils.Styles(out) : out)
                } else {
                   print += '\n'
-                  let out = formatPrefixList(keys.map(k => ({ usage: command, use: k })))
+                  let out = formatPrefixList(keys.map(k => ({
+                     usage: command,
+                     use: k
+                  })))
                   let formattedPrint = style === 6 ? Utils.Styles(print + out) : (print + out)
+
                   client.sendMessageModify(m.chat, formattedPrint + '\n\n' + global.footer, m, {
-                     ads: false, largeThumb: true, thumbnail: Utils.isUrl(setting.cover) ? setting.cover : Buffer.from(setting.cover, 'base64'), url: setting.link
+                     ads: false,
+                     largeThumb: true,
+                     thumbnail: Utils.isUrl(setting.cover) ? setting.cover : Buffer.from(setting.cover, 'base64'),
+                     url: setting.link
                   })
                }
                break
@@ -121,9 +152,20 @@ export const run = {
                   if (commands.length === 0) return
                   m.reply(Utils.Styles(formatPrefixList(commands)))
                } else {
-                  const buttonsV7 = [{ name: 'single_select', buttonParamsJson: JSON.stringify({ title: 'Tap Here!', sections: buildSections() }) }]
+                  const buttonsV7 = [{
+                     name: 'single_select',
+                     buttonParamsJson: JSON.stringify({
+                        title: 'Tap Here!',
+                        sections: buildSections()
+                     })
+                  }]
+
                   client.sendIAMessage(m.chat, buttonsV7, m, {
-                     header: global.header, content: message, v2: true, footer: global.footer, media: Utils.isUrl(setting.cover) ? setting.cover : Buffer.from(setting.cover, 'base64')
+                     header: global.header,
+                     content: message,
+                     v2: true,
+                     footer: global.footer,
+                     media: Utils.isUrl(setting.cover) ? setting.cover : Buffer.from(setting.cover, 'base64')
                   })
                }
                break
@@ -135,14 +177,59 @@ export const run = {
                   m.reply(Utils.Styles(formatPrefixList(commands)))
                } else {
                   const buttonsV8 = [
-                     { name: 'cta_url', buttonParamsJson: JSON.stringify({ display_text: 'Wapify - WhatsApp Gateway', url: 'https://wapify.neoxr.eu', merchant_url: 'https://wapify.neoxr.eu' }) },
-                     { name: 'cta_url', buttonParamsJson: JSON.stringify({ display_text: 'Neoxr API', url: 'https://api.neoxr.eu', merchant_url: 'https://api.neoxr.eu' }) },
-                     { name: 'cta_url', buttonParamsJson: JSON.stringify({ display_text: 'Temporary Uploader', url: 'https://s.neoxr.eu', merchant_url: 'https://s.neoxr.eu' }) },
-                     { name: 'cta_url', buttonParamsJson: JSON.stringify({ display_text: 'Neoxr Official Store', url: 'https://shop.neoxr.eu', merchant_url: 'https://shop.neoxr.eu' }) },
-                     { name: 'single_select', buttonParamsJson: JSON.stringify({ title: 'Next Page', sections: buildSections() }) }
+                     {
+                        name: 'cta_url',
+                        buttonParamsJson: JSON.stringify({
+                           display_text: 'Wapify - WhatsApp Gateway',
+                           url: 'https://wapify.neoxr.eu',
+                           merchant_url: 'https://wapify.neoxr.eu'
+                        })
+                     },
+                     {
+                        name: 'cta_url',
+                        buttonParamsJson: JSON.stringify({
+                           display_text: 'Neoxr API',
+                           url: 'https://api.neoxr.eu',
+                           merchant_url: 'https://api.neoxr.eu'
+                        })
+                     },
+                     {
+                        name: 'cta_url',
+                        buttonParamsJson: JSON.stringify({
+                           display_text: 'Temporary Uploader',
+                           url: 'https://s.neoxr.eu',
+                           merchant_url: 'https://s.neoxr.eu'
+                        })
+                     },
+                     {
+                        name: 'cta_url',
+                        buttonParamsJson: JSON.stringify({
+                           display_text: 'Neoxr Official Store',
+                           url: 'https://shop.neoxr.eu',
+                           merchant_url: 'https://shop.neoxr.eu'
+                        })
+                     },
+                     {
+                        name: 'single_select',
+                        buttonParamsJson: JSON.stringify({
+                           title: 'Next Page',
+                           sections: buildSections()
+                        })
+                     }
                   ]
+
                   client.sendIAMessage(m.chat, buttonsV8, m, {
-                     header: global.header, content: message, v2: true, footer: global.footer, media: Utils.isUrl(setting.cover) ? setting.cover : Buffer.from(setting.cover, 'base64'), multiple: { name: 'オートメーション', code: 'Neoxr Creative', list_title: 'Select Menu', button_title: 'Tap Here!' }
+                     header: global.header,
+                     content: message,
+                     v2: true,
+                     footer: global.footer,
+                     media: Utils.isUrl(setting.cover) ? setting.cover : Buffer.from(setting.cover, 'base64'),
+                     multiple: {
+                        name: 'オートメーション',
+                        code: 'Neoxr Creative',
+                        list_title: 'Select Menu',
+                        button_title: 'Tap Here!'
+                     }
                   })
                }
                break
